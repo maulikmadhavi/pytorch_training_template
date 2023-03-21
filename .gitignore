@@ -1,0 +1,4 @@
+*.pth
+logs/
+tblogs/
+prac.py

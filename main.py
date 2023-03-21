@@ -1,6 +1,7 @@
 """
 Pytorch model training templates
 """
+from typing import List, Tuple
 import time
 import os
 import copy
@@ -18,6 +19,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 import torch.nn.functional as F
 import torch.optim as optim
+import logging
 
 
 cudnn.benchmark = True
@@ -26,12 +28,14 @@ cudnn.benchmark = True
 # ======================= Hyper parameters ================================
 BS = 32
 LR = 0.01
-NEPOCH = 20
+NEPOCH = 3
 NB = 20
 WD = 1e-4
 MOMENTUM = 0.9
 SCH_STEP = 10
 SCH_GAMMA = 0.1
+LOGFILE = "logs/log.txt"
+TBLOGS = "tblogs/"
 
 # ======================== Data preparation ==============================
 train_transforms = transforms.Compose(
@@ -79,6 +83,7 @@ classes = class_names
 model = torchvision.models.resnet18(pretrained=True)
 model.fc = nn.Linear(model.fc.in_features, len(class_names))
 model = model.to(device)
+
 # ================= Optimizer and loss function =================
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=LR, momentum=MOMENTUM, weight_decay=WD)
@@ -90,7 +95,9 @@ def train_model(
     criterion: nn.Module,
     optimizer: optim,
     scheduler: lr_scheduler,
-    num_epochs: int = 2,
+    num_epochs: int,
+    logger: logging.RootLogger,
+    tb_writer: SummaryWriter,
 ) -> nn.Module:
     since = time.time()
 
@@ -98,8 +105,8 @@ def train_model(
     best_acc = 0.0
 
     for epoch in range(num_epochs):
-        print(f"Epoch {epoch}/{num_epochs - 1}")
-        print("-" * 10)
+        logger.info(f"Epoch {epoch}/{num_epochs - 1}")
+        logger.info("-" * 10)
 
         # Each epoch has a training and validation phase
         for phase in ["train", "val"]:
@@ -112,7 +119,7 @@ def train_model(
             running_corrects = 0
 
             # Iterate over data.
-            for inputs, labels in dataloaders[phase]:
+            for batch_idx, (inputs, labels) in enumerate(dataloaders[phase]):
                 inputs = inputs.to(device)
                 labels = labels.to(device)
 
@@ -125,7 +132,11 @@ def train_model(
                     outputs = model(inputs)
                     _, preds = torch.max(outputs, 1)
                     loss = criterion(outputs, labels)
-
+                    tb_writer.add_scalar(
+                        f"Step/loss-{phase}",
+                        loss.item(),
+                        batch_idx + epoch * len(dataloaders[phase]),
+                    )
                     # backward + optimize only if in training phase
                     if phase == "train":
                         loss.backward()
@@ -139,24 +150,57 @@ def train_model(
 
             epoch_loss = running_loss / dataset_sizes[phase]
             epoch_acc = running_corrects.double() / dataset_sizes[phase]
+            tb_writer.add_scalar(f"epoch/loss-{phase}", epoch_loss, epoch)
+            tb_writer.add_scalar(f"epoch/acc-{phase}", epoch_acc, epoch)
 
-            print(f"{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}")
+            logger.info(f"{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}")
 
             # deep copy the model
             if phase == "val" and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
 
-        print()
-
     time_elapsed = time.time() - since
-    print(f"Training complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s")
-    print(f"Best val Acc: {best_acc:4f}")
+    logger.info(
+        f"Training complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s"
+    )
+    logger.info(f"Best val Acc: {best_acc:4f}")
 
     # load best model weights
     model.load_state_dict(best_model_wts)
-    return model
+    return model, best_acc
 
 
-model = train_model(model, criterion, optimizer, exp_lr_scheduler, NEPOCH)
+# ========================== MAIN SCRIPT =====================================
+
+# Create tensorboard logger
+# get some random training images
+tb_writer = SummaryWriter(TBLOGS)
+dataiter = iter(trainloader)
+images, labels = dataiter.next()
+img_grid = torchvision.utils.make_grid(images.to(device))
+tb_writer.add_image("image grid visulization", img_grid)
+tb_writer.add_graph(model, images.to(device))
+
+
+# Create file logger
+if not os.path.exists(os.path.dirname(LOGFILE)):
+    os.makedirs(os.path.dirname(LOGFILE))
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+basic_formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s:%(message)s")
+sh = logging.StreamHandler()
+fh = logging.FileHandler(LOGFILE, "w")
+logger.addHandler(fh)
+fh.setFormatter(basic_formatter)
+
+
+# Call the train_model function
+model, best_acc = train_model(
+    model, criterion, optimizer, exp_lr_scheduler, NEPOCH, logger, tb_writer
+)
+
+torch.save(model, f"best_model_{best_acc:0.3f}.pth")
+
 print("Finished Training")
