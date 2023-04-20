@@ -1,4 +1,10 @@
 *.pth
 logs/
 tblogs/
-prac.py
+cifar10_data/
+*.jpg
+*.png
+*.pyc
+
+notebook/
+*/__pycache__/

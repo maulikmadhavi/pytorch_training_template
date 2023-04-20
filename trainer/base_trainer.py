@@ -9,6 +9,10 @@ import time
 import copy
 import torchmetrics  # To compute accuracy, F1 score, etc.
 from tqdm import tqdm
+import sys
+
+sys.path.append("..")
+from helpers.plotting import get_cam
 
 
 def batch_forward(model, inputs, labels, criterion, device):
@@ -111,59 +115,28 @@ def train_model(
             model, dataloaders["val"], device, criterion, epoch, tb_writer, num_classes
         )
 
+        model.train()
+        cam_output, cam_input = get_cam(model, dataloaders["val"])
+        tb_writer.add_image(
+            "Step/cam",
+            cam_output,
+            epoch,
+            dataformats="CHW",
+        )
+        tb_writer.add_image(
+            "Step/cam_input",
+            cam_input,
+            epoch,
+            dataformats="CHW",
+        )
+
+        model.to(device)
         logger.info(
             f"Train Loss: {train_acc['train_loss']:.4f}, Train Acc: {train_acc['train_acc']:.4f}"
         )
         logger.info(
             f"Val Loss: {val_metrics['val_loss']:.4f}, Val Acc: {val_metrics['val_acc']:.4f}, Val F1: {val_metrics['val_f1']:.4f}"
         )
-
-        # Each epoch has a training and validation phase
-        # for phase in ["train", "val"]:
-        #     if phase == "train":
-        #         model.train()  # Set model to training mode
-        #     else:
-        #         model.eval()  # Set model to evaluate mode
-
-        #     running_loss = 0.0
-        #     running_corrects = 0
-
-        #     # Iterate over data.
-        #     for batch_idx, (inputs, labels) in enumerate(dataloaders[phase]):
-        #         inputs = inputs.to(device)
-        #         labels = labels.to(device)
-
-        #         # zero the parameter gradients
-        #         optimizer.zero_grad()
-
-        #         # forward
-        #         # track history if only in train
-        #         with torch.set_grad_enabled(phase == "train"):
-        #             outputs = model(inputs)
-        #             _, preds = torch.max(outputs, 1)
-        #             loss = criterion(outputs, labels)
-        #             tb_writer.add_scalar(
-        #                 f"Step/loss-{phase}",
-        #                 loss.item(),
-        #                 batch_idx + epoch * len(dataloaders[phase]),
-        #             )
-        #             # backward + optimize only if in training phase
-        #             if phase == "train":
-        #                 loss.backward()
-        #                 optimizer.step()
-
-        #         # statistics
-        #         running_loss += loss.item() * inputs.size(0)
-        #         running_corrects += torch.sum(preds == labels.data)
-        #     if phase == "train":
-        #         scheduler.step()
-
-        #     epoch_loss = running_loss / len(dataloaders[phase].dataset)
-        #     epoch_acc = running_corrects.double() / len(dataloaders[phase].dataset)
-        #     tb_writer.add_scalar(f"epoch/loss-{phase}", epoch_loss, epoch)
-        #     tb_writer.add_scalar(f"epoch/acc-{phase}", epoch_acc, epoch)
-
-        #     logger.info(f"{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}")
 
         #     # deep copy the model
     if val_metrics["val_acc"] > best_acc:

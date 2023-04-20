@@ -37,7 +37,7 @@ cudnn.benchmark = True
 # ======================= Hyper parameters ================================
 BS = 32
 LR = 0.01
-NEPOCH = 3
+NEPOCH = 15
 NB = 20
 WD = 1e-4
 MOMENTUM = 0.9
@@ -93,14 +93,6 @@ tb_writer.add_graph(model, images.to(device))
 # Create file logger
 if not os.path.exists(os.path.dirname(LOGFILE)):
     os.makedirs(os.path.dirname(LOGFILE))
-
-# logger = logging.getLogger(__name__)
-# logger.setLevel(logging.NOTSET)
-# basic_formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s:%(message)s")
-# sh = logging.StreamHandler()
-# fh = logging.FileHandler(LOGFILE, "w")
-# logger.addHandler(fh)
-# fh.setFormatter(basic_formatter)
 
 # Create a logger object
 logger = logging.getLogger(__name__)
