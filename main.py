@@ -7,6 +7,8 @@ import os
 import copy
 
 import torch
+import torchvision
+
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim import lr_scheduler
@@ -20,8 +22,15 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 import torch.optim as optim
 import logging
+from loss.prepare_loss import get_loss
+from optimizer.prepare_optimizer import prepare_optimizer
+from data.get_transforms import train_transforms, val_transforms, inv_normalize
+from data.prepare_data import get_data
+from data.get_loader import get_loader
+from trainer.base_trainer import train_model
+from models.prepare_model import ResNet18
 
-
+Tensor = torch.tensor
 cudnn.benchmark = True
 
 
@@ -38,169 +47,102 @@ LOGFILE = "logs/log.txt"
 TBLOGS = "tblogs/"
 
 # ======================== Data preparation ==============================
-train_transforms = transforms.Compose(
-    [
-        transforms.RandomResizedCrop(224),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-    ]
-)
-
-val_transforms = transforms.Compose(
-    [
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-    ]
-)
-
-trainset = torchvision.datasets.CIFAR10(
-    root="../data", train=True, download=False, transform=train_transforms
-)
-trainloader = torch.utils.data.DataLoader(
-    trainset, batch_size=BS, shuffle=True, num_workers=2
-)
-
-testset = torchvision.datasets.CIFAR10(
-    root="../data", train=False, download=False, transform=val_transforms
-)
-testloader = torch.utils.data.DataLoader(
-    testset, batch_size=BS, shuffle=False, num_workers=2
-)
-
-image_datasets = {"train": trainset, "val": testset}
-dataset_sizes = {x: len(image_datasets[x]) for x in ["train", "val"]}
-class_names = image_datasets["train"].classes
-dataloaders = {"train": trainloader, "val": testloader}
-
+# Set the device to GPU if it exists, otherwise CPU
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+trainset, valset = get_data(train_transforms, val_transforms)
+
+# Create a dataloader for the training data
+train_loader, val_loader = get_loader(trainset, valset, batch_size=BS)
+
+# Create a dictionary of the datasets and their sizes
+image_datasets = {"train": trainset, "val": valset}
+dataset_sizes = {x: len(image_datasets[x]) for x in ["train", "val"]}
+
+# Create a dictionary of the classes
+class_names = image_datasets["train"].classes
+
+# Create a dictionary of the dataloaders
+dataloaders = {"train": train_loader, "val": val_loader}
+
+
 # ================== Model defination ===============================
+# Define the number of classes
 classes = class_names
 
-model = torchvision.models.resnet18(pretrained=True)
-model.fc = nn.Linear(model.fc.in_features, len(class_names))
+# Move the model to the GPU if it is available
+model = ResNet18(num_classes=len(classes))
 model = model.to(device)
 
 # ================= Optimizer and loss function =================
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model.parameters(), lr=LR, momentum=MOMENTUM, weight_decay=WD)
-exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=SCH_STEP, gamma=SCH_GAMMA)
-
-# ================= Training loops ===============================
-def train_model(
-    model: nn.Module,
-    criterion: nn.Module,
-    optimizer: optim,
-    scheduler: lr_scheduler,
-    num_epochs: int,
-    logger: logging.RootLogger,
-    tb_writer: SummaryWriter,
-) -> nn.Module:
-    since = time.time()
-
-    best_model_wts = copy.deepcopy(model.state_dict())
-    best_acc = 0.0
-
-    for epoch in range(num_epochs):
-        logger.info(f"Epoch {epoch}/{num_epochs - 1}")
-        logger.info("-" * 10)
-
-        # Each epoch has a training and validation phase
-        for phase in ["train", "val"]:
-            if phase == "train":
-                model.train()  # Set model to training mode
-            else:
-                model.eval()  # Set model to evaluate mode
-
-            running_loss = 0.0
-            running_corrects = 0
-
-            # Iterate over data.
-            for batch_idx, (inputs, labels) in enumerate(dataloaders[phase]):
-                inputs = inputs.to(device)
-                labels = labels.to(device)
-
-                # zero the parameter gradients
-                optimizer.zero_grad()
-
-                # forward
-                # track history if only in train
-                with torch.set_grad_enabled(phase == "train"):
-                    outputs = model(inputs)
-                    _, preds = torch.max(outputs, 1)
-                    loss = criterion(outputs, labels)
-                    tb_writer.add_scalar(
-                        f"Step/loss-{phase}",
-                        loss.item(),
-                        batch_idx + epoch * len(dataloaders[phase]),
-                    )
-                    # backward + optimize only if in training phase
-                    if phase == "train":
-                        loss.backward()
-                        optimizer.step()
-
-                # statistics
-                running_loss += loss.item() * inputs.size(0)
-                running_corrects += torch.sum(preds == labels.data)
-            if phase == "train":
-                scheduler.step()
-
-            epoch_loss = running_loss / dataset_sizes[phase]
-            epoch_acc = running_corrects.double() / dataset_sizes[phase]
-            tb_writer.add_scalar(f"epoch/loss-{phase}", epoch_loss, epoch)
-            tb_writer.add_scalar(f"epoch/acc-{phase}", epoch_acc, epoch)
-
-            logger.info(f"{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}")
-
-            # deep copy the model
-            if phase == "val" and epoch_acc > best_acc:
-                best_acc = epoch_acc
-                best_model_wts = copy.deepcopy(model.state_dict())
-
-    time_elapsed = time.time() - since
-    logger.info(
-        f"Training complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s"
-    )
-    logger.info(f"Best val Acc: {best_acc:4f}")
-
-    # load best model weights
-    model.load_state_dict(best_model_wts)
-    return model, best_acc
-
+criterion = get_loss("CrossEntropyLoss")
+optimizer, exp_lr_scheduler = prepare_optimizer(
+    model, LR, WD, MOMENTUM, SCH_STEP, SCH_GAMMA
+)
 
 # ========================== MAIN SCRIPT =====================================
 
 # Create tensorboard logger
-# get some random training images
 tb_writer = SummaryWriter(TBLOGS)
-dataiter = iter(trainloader)
+dataiter = iter(train_loader)
 images, labels = dataiter.next()
 img_grid = torchvision.utils.make_grid(images.to(device))
-tb_writer.add_image("image grid visulization", img_grid)
+tb_writer.add_image("image grid visulization", inv_normalize(img_grid))
 tb_writer.add_graph(model, images.to(device))
-
 
 # Create file logger
 if not os.path.exists(os.path.dirname(LOGFILE)):
     os.makedirs(os.path.dirname(LOGFILE))
 
+# logger = logging.getLogger(__name__)
+# logger.setLevel(logging.NOTSET)
+# basic_formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s:%(message)s")
+# sh = logging.StreamHandler()
+# fh = logging.FileHandler(LOGFILE, "w")
+# logger.addHandler(fh)
+# fh.setFormatter(basic_formatter)
+
+# Create a logger object
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-basic_formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s:%(message)s")
-sh = logging.StreamHandler()
-fh = logging.FileHandler(LOGFILE, "w")
-logger.addHandler(fh)
-fh.setFormatter(basic_formatter)
+
+# Create a file handler
+log_file = LOGFILE
+file_handler = logging.FileHandler(log_file)
+file_handler.setLevel(logging.DEBUG)
+
+# Create a console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+
+# Create a formatter
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+# Add the formatter to the handlers
+file_handler.setFormatter(formatter)
+console_handler.setFormatter(formatter)
+
+# Add the handlers to the logger
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
 
 
+logger.info("Started Training")
 # Call the train_model function
 model, best_acc = train_model(
-    model, criterion, optimizer, exp_lr_scheduler, NEPOCH, logger, tb_writer
+    model,
+    dataloaders,
+    device,
+    criterion,
+    optimizer,
+    exp_lr_scheduler,
+    NEPOCH,
+    logger,
+    tb_writer,
+    num_classes=len(classes),
 )
 
 torch.save(model, f"best_model_{best_acc:0.3f}.pth")
 
-print("Finished Training")
+logger.info("Finished Training")
+tb_writer.close()
