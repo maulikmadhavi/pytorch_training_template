@@ -1,3 +1,5 @@
+__pycache__/
+__pycache__
 *.pth
 logs/
 tblogs/
@@ -7,4 +9,4 @@ cifar10_data/
 *.pyc
 
 notebook/
-*/__pycache__/
+outputs/

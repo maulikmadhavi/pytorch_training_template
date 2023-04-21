@@ -1,0 +1,23 @@
+# Template of hydra configuration file
+
+# hydra project output dir
+
+hydra:
+    run:
+        dir: outputs/BS=${data.BS}-LR=${train.LR}-${now:%Y-%m-%d}
+
+data:
+    BS: 32
+
+train:
+    LR: 0.01
+    NEPOCH: 15
+    NB: 20
+    WD: 1e-4
+    MOMENTUM: 0.9
+    SCH_STEP: 10
+    SCH_GAMMA: 0.1
+
+output:
+    LOGFILE: "logs/log.txt"
+    TBLOGS: "tblogs/"
