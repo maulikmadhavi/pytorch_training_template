@@ -2,26 +2,14 @@
 Pytorch model training templates
 """
 from typing import List, Tuple
-import time
-import os
-import copy
 
 import torch
 import torchvision
 
-import torch.nn as nn
-import torch.optim as optim
-from torch.optim import lr_scheduler
 import torch.backends.cudnn as cudnn
-import numpy as np
 import torchvision
-from torchvision import datasets, models, transforms
-import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 
-import torch.nn.functional as F
-import torch.optim as optim
-import logging
 from loss.prepare_loss import get_loss
 from optimizer.prepare_optimizer import prepare_optimizer
 from data.get_transforms import train_transforms, val_transforms, inv_normalize
@@ -29,7 +17,7 @@ from data.prepare_data import get_data
 from data.get_loader import get_loader
 from trainer.base_trainer import train_model
 from models.prepare_model import ResNet18
-
+from helpers.logger import get_logger
 Tensor = torch.tensor
 cudnn.benchmark = True
 
@@ -85,38 +73,13 @@ optimizer, exp_lr_scheduler = prepare_optimizer(
 # Create tensorboard logger
 tb_writer = SummaryWriter(TBLOGS)
 dataiter = iter(train_loader)
-images, labels = dataiter.next()
+images, labels = next(dataiter)
 img_grid = torchvision.utils.make_grid(images.to(device))
 tb_writer.add_image("image grid visulization", inv_normalize(img_grid))
 tb_writer.add_graph(model, images.to(device))
 
 # Create file logger
-if not os.path.exists(os.path.dirname(LOGFILE)):
-    os.makedirs(os.path.dirname(LOGFILE))
-
-# Create a logger object
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-# Create a file handler
-log_file = LOGFILE
-file_handler = logging.FileHandler(log_file)
-file_handler.setLevel(logging.DEBUG)
-
-# Create a console handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-
-# Create a formatter
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
-# Add the formatter to the handlers
-file_handler.setFormatter(formatter)
-console_handler.setFormatter(formatter)
-
-# Add the handlers to the logger
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
+logger = get_logger(LOGFILE)
 
 
 logger.info("Started Training")

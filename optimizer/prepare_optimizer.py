@@ -16,6 +16,7 @@ def prepare_optimizer(
     momentum: float,
     sch_step: int,
     sch_gamma: float,
+    use_scheduler: bool = True,
 ) -> Tuple[optim.SGD, optim.lr_scheduler.StepLR]:
     """
     This function prepares the optimizer for training.
@@ -24,10 +25,12 @@ def prepare_optimizer(
     optimizer = optim.SGD(model.parameters(), lr=lr, weight_decay=wd, momentum=momentum)
 
     # Define the scheduler
-    scheduler = optim.lr_scheduler.StepLR(
-        optimizer, step_size=sch_step, gamma=sch_gamma
-    )
-
+    if use_scheduler:
+        scheduler = optim.lr_scheduler.StepLR(
+            optimizer, step_size=sch_step, gamma=sch_gamma
+        )
+    else:
+        scheduler = None
     return optimizer, scheduler
 
 
@@ -38,3 +41,22 @@ def prepare_optimizer(
 #     This function is used to get the loss function from available list of pytorch loss functions.
 #     """
 #     return getattr(torch.nn, loss_name)
+
+def test_prepare_optimizer():
+    """
+    This function tests the prepare_optimizer function.
+    """
+    model = nn.Linear(10, 2)
+    lr = 0.01
+    wd = 1e-4
+    momentum = 0.9
+    sch_step = 10
+    sch_gamma = 0.1
+    optimizer, scheduler = prepare_optimizer(
+        model, lr, wd, momentum, sch_step, sch_gamma
+    )
+    assert isinstance(optimizer, optim.SGD)
+    assert isinstance(scheduler, optim.lr_scheduler.StepLR)
+    
+if __name__ == "__main__":
+    test_prepare_optimizer()

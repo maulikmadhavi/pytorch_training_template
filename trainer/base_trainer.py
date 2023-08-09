@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Tuple
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -15,7 +15,15 @@ sys.path.append("..")
 from helpers.plotting import get_cam
 
 
-def batch_forward(model, inputs, labels, criterion, device):
+def batch_forward(model: nn.Module, 
+                  inputs: torch.Tensor, 
+                  labels: torch.Tensor, 
+                  criterion: nn.Module, 
+                  device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+    """perform forward pass for a batch of inputs and labels
+    Returns:
+        tuple(torch.Tensor, torch.Tensor): outputs and loss
+    """
     inputs = inputs.to(device)
     labels = labels.to(device)
     outputs = model(inputs)
@@ -24,10 +32,26 @@ def batch_forward(model, inputs, labels, criterion, device):
 
 
 def train_one_epoch(
-    model, dataloader, device, criterion, optimizer, scheduler, epoch, tb_writer
-):
+    model: nn.Module, 
+    dataloader: torch.utils.data.DataLoader, 
+    device: torch.device, 
+    criterion: nn.Module, 
+    optimizer: optim.Optimizer, 
+    scheduler: optim.lr_scheduler, 
+    epoch: int, 
+    tb_writer: SummaryWriter,
+    num_classes: int,
+) -> Tuple[nn.Module, optim.Optimizer, optim.lr_scheduler, Dict[str, float]]:
+    """Train for one epoch. Returns the model, optimizer, scheduler and accuracy for the epoch.
+
+    Args:
+        model (nn.Module): The model to train        
+
+    Returns:
+        trained model, optimizer, scheduler, accuracy for the epoch
+    """
     model.train()
-    metric = torchmetrics.Accuracy()
+    metric = torchmetrics.Accuracy(task="multiclass", num_classes=num_classes)
     total_loss = 0.0
     for batch_idx, (inputs, labels) in tqdm(
         enumerate(dataloader), total=len(dataloader)
@@ -51,12 +75,21 @@ def train_one_epoch(
 
 @torch.no_grad()
 def validate_one_epoch(
-    model, dataloader, device, criterion, epoch, tb_writer, num_classes
-):
-    """Validation for one epoch. Returns the accuracy and loss for the epoch."""
+    model: nn.Module,
+    dataloader: torch.utils.data.DataLoader, 
+    device: torch.device,
+    criterion: nn.Module,
+    epoch: int,
+    tb_writer: SummaryWriter,
+    num_classes: int
+) -> Dict[str, float]:
+    """Validation for one epoch. Returns the accuracy and loss for the epoch.
+    Returns:
+    validation accuracy and loss for the epoch
+    """
     model.eval()
-    metric = torchmetrics.Accuracy()
-    f1 = torchmetrics.F1Score(num_classes=num_classes)
+    metric = torchmetrics.Accuracy(task="multiclass", num_classes=num_classes)
+    f1 = torchmetrics.F1Score(task="multiclass", num_classes=num_classes)
     total_loss = 0.0
     for batch_idx, (inputs, labels) in tqdm(
         enumerate(dataloader), total=len(dataloader)
@@ -91,7 +124,11 @@ def train_model(
     logger: logging.Logger,
     tb_writer: SummaryWriter,
     num_classes: int,
-) -> nn.Module:
+) -> Tuple[nn.Module, float]:
+    """ Training model loop for num_epochs.
+    Returns:
+        tuple(nn.Module, float): best model and best accuracy
+    """
     since = time.time()
 
     best_model_wts = copy.deepcopy(model.state_dict())
@@ -110,6 +147,7 @@ def train_model(
             scheduler,
             epoch,
             tb_writer,
+            num_classes
         )
         val_metrics = validate_one_epoch(
             model, dataloaders["val"], device, criterion, epoch, tb_writer, num_classes

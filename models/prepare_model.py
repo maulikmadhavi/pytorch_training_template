@@ -54,11 +54,37 @@ Tensor = torch.tensor
 class ResNet18(nn.Module):
     "Modify to append CAM"
 
-    def __init__(self, num_classes):
+    def __init__(self, num_classes: int) -> None:
+        """ Create a ResNet18 model with the given number of classes.
+
+        Args:
+            num_classes (int): number of classes in the dataset
+        """
         super().__init__()
         model = torchvision.models.resnet18(pretrained=True)
         model.fc = nn.Linear(model.fc.in_features, num_classes)
         self.model = model
 
     def forward(self, x: Tensor) -> Tensor:
+        """ Forward pass of the model.
+        
+        Args:
+            x (Tensor): input tensor to the model of shape (N, C, H, W)
+        
+        Returns:
+            Tensor: output tensor of shape (N, num_classes)
+        """
         return self.model(x)
+
+
+def test_model():
+    """ Test the model """
+    model = ResNet18(10)
+    x = torch.randn(1, 3, 32, 32)
+    y = model(x)
+    print(y.shape)
+    assert y.shape == (1, 10)
+
+
+if __name__ == "__main__":
+    test_model()
