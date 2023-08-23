@@ -15,11 +15,13 @@ sys.path.append("..")
 from helpers.plotting import get_cam
 
 
-def batch_forward(model: nn.Module, 
-                  inputs: torch.Tensor, 
-                  labels: torch.Tensor, 
-                  criterion: nn.Module, 
-                  device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+def batch_forward(
+    model: nn.Module,
+    inputs: torch.Tensor,
+    labels: torch.Tensor,
+    criterion: nn.Module,
+    device: torch.device,
+) -> Tuple[torch.Tensor, torch.Tensor]:
     """perform forward pass for a batch of inputs and labels
     Returns:
         tuple(torch.Tensor, torch.Tensor): outputs and loss
@@ -32,20 +34,20 @@ def batch_forward(model: nn.Module,
 
 
 def train_one_epoch(
-    model: nn.Module, 
-    dataloader: torch.utils.data.DataLoader, 
-    device: torch.device, 
-    criterion: nn.Module, 
-    optimizer: optim.Optimizer, 
-    scheduler: optim.lr_scheduler, 
-    epoch: int, 
+    model: nn.Module,
+    dataloader: torch.utils.data.DataLoader,
+    device: torch.device,
+    criterion: nn.Module,
+    optimizer: optim.Optimizer,
+    scheduler: optim.lr_scheduler,
+    epoch: int,
     tb_writer: SummaryWriter,
     num_classes: int,
 ) -> Tuple[nn.Module, optim.Optimizer, optim.lr_scheduler, Dict[str, float]]:
     """Train for one epoch. Returns the model, optimizer, scheduler and accuracy for the epoch.
 
     Args:
-        model (nn.Module): The model to train        
+        model (nn.Module): The model to train
 
     Returns:
         trained model, optimizer, scheduler, accuracy for the epoch
@@ -76,12 +78,12 @@ def train_one_epoch(
 @torch.no_grad()
 def validate_one_epoch(
     model: nn.Module,
-    dataloader: torch.utils.data.DataLoader, 
+    dataloader: torch.utils.data.DataLoader,
     device: torch.device,
     criterion: nn.Module,
     epoch: int,
     tb_writer: SummaryWriter,
-    num_classes: int
+    num_classes: int,
 ) -> Dict[str, float]:
     """Validation for one epoch. Returns the accuracy and loss for the epoch.
     Returns:
@@ -125,7 +127,7 @@ def train_model(
     tb_writer: SummaryWriter,
     num_classes: int,
 ) -> Tuple[nn.Module, float]:
-    """ Training model loop for num_epochs.
+    """Training model loop for num_epochs.
     Returns:
         tuple(nn.Module, float): best model and best accuracy
     """
@@ -147,7 +149,7 @@ def train_model(
             scheduler,
             epoch,
             tb_writer,
-            num_classes
+            num_classes,
         )
         val_metrics = validate_one_epoch(
             model, dataloaders["val"], device, criterion, epoch, tb_writer, num_classes
