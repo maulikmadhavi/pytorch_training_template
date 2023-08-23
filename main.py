@@ -48,10 +48,10 @@ cudnn.benchmark = True
 # LOGFILE = "logs/log.txt"
 # TBLOGS = "tblogs/"
 
+
 # Moving alll the hyperparameters to hydra config file
 @hydra.main(config_path="config", config_name="base.yaml")
 def main(cfg: DictConfig) -> None:
-
     # ======================== Hyper parameters ==============================
     BS = cfg.data.BS
     LR = cfg.train.LR

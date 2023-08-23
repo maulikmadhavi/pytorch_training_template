@@ -9,18 +9,22 @@ AUTHOR = "Maulik Madhavi"
 AUTHOR_EMAIL = "maulikmadhavi@gmail.com"
 
 setup(
-    name=NAME, version=VERSION, description=DESCRIPTION,
-    author=AUTHOR, author_email=AUTHOR_EMAIL,
-    maintainer=AUTHOR, maintainer_email=AUTHOR_EMAIL,
+    name=NAME,
+    version=VERSION,
+    description=DESCRIPTION,
+    author=AUTHOR,
+    author_email=AUTHOR_EMAIL,
+    maintainer=AUTHOR,
+    maintainer_email=AUTHOR_EMAIL,
     requires=["numpy"],
     install_requires=["numpy"],
     classifiers=[
         "Environment :: Console",
         "Topic :: System :: Clustering",
-        "Intended Audience :: Science/Research"
+        "Intended Audience :: Science/Research",
     ],
     license="Apache-2.0",
     platforms=["all"],
     long_description_content_type="text/markdown",
-    packages=find_packages()
+    packages=find_packages(),
 )
