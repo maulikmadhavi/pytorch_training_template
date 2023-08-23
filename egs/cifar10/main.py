@@ -49,7 +49,7 @@ cudnn.benchmark = True
 # TBLOGS = "tblogs/"
 
 # Moving alll the hyperparameters to hydra config file
-@hydra.main(config_path="config", config_name="base.yaml")
+@hydra.main(config_path="/home/maulik/Documents/Tool/pytorch_training_template/egs/cifar10/", config_name="cifar10.yaml")
 def main(cfg: DictConfig) -> None:
 
     # ======================== Hyper parameters ==============================

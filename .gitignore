@@ -1,3 +1,14 @@
+.installed.cfg
+bin
+develop-eggs
+dist
+downloads
+eggs
+parts
+src/*.egg-info
+lib
+lib64
+
 __pycache__/
 __pycache__
 *.pth
@@ -10,3 +21,4 @@ cifar10_data/
 
 notebook/
 outputs/
+ptt.egg-info/

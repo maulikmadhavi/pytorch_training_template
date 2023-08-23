@@ -10,7 +10,7 @@ def get_data(
 ) -> Tuple[torchvision.datasets.CIFAR10, torchvision.datasets.CIFAR10]:
     # Load the training data and apply the training transforms
     trainset = torchvision.datasets.CIFAR10(
-        root="/home/maulik/practice/pytorch_templates/cifar10_data",
+        root="/home/maulik/Documents/data/cifar10/",
         train=True,
         download=False,
         transform=train_transforms,
@@ -18,7 +18,7 @@ def get_data(
 
     # Load the test data and apply the validation transforms
     testset = torchvision.datasets.CIFAR10(
-        root="/home/maulik/practice/pytorch_templates/cifar10_data",
+        root="/home/maulik/Documents/data/cifar10/",
         train=False,
         download=False,
         transform=val_transforms,
